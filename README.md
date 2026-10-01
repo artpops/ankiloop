@@ -11,8 +11,8 @@
 
 Practise vocabulary **on a steady rhythm**: every X seconds MicroAnki pops up
 one flashcard from a deck you choose — drawn straight from your real
-[AnkiDroid](https://github.com/ankidroid/Anki-Android) collection — no matter
-what you are doing.
+[AnkiDroid](https://github.com/ankidroid/Anki-Android) collection — whenever
+your screen is on and unlocked.
 
 It uses the
 [AnkiDroid API / database ContentProvider](https://github.com/ankidroid/apisample)
@@ -25,9 +25,11 @@ normal spaced-repetition scheduling keeps working.
    300s / 5min), then press **Start timer**.
 2. A foreground service (`CardTimerService`) waits for the interval, then shows
    a full-screen **flashcard** on top: question → *Show answer* → grade it
-   (Again / Hard / Good / Easy). It uses a direct launch plus a full-screen
-   intent notification so the card appears even from the background on
-   Android 10+.
+   (Again / Hard / Good / Easy) — but only if the screen is on and the
+   device is unlocked. Ticks that fire while the screen is off or locked are
+   skipped, so cards never wake the phone or pile up on the lock screen.
+   It uses a direct launch plus a full-screen intent notification so the
+   card appears even from the background on Android 10+.
 3. Grading is sent to AnkiDroid, which reschedules the card. The timer keeps
    running until you press **Stop timer** (ongoing notification also has a
    Stop action). It restarts after reboot if left enabled.

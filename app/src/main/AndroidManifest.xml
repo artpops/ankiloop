@@ -42,14 +42,12 @@
             </intent-filter>
         </activity>
 
-        <!-- Shown on top on every timer tick. Its own task so it can return cleanly. -->
+        <!-- Shown on top on every timer tick (screen-on only, never on lock screen). Its own task so it can return cleanly. -->
         <activity
             android:name=".FlashcardActivity"
             android:exported="false"
             android:excludeFromRecents="true"
             android:launchMode="singleInstance"
-            android:showOnLockScreen="true"
-            android:turnScreenOn="true"
             android:taskAffinity=""
             android:theme="@style/Theme.MicroAnki.Flashcard" />
 

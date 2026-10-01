@@ -5,12 +5,14 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
+import android.app.KeyguardManager
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.IBinder
+import android.os.PowerManager
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import kotlinx.coroutines.CoroutineScope
@@ -21,10 +23,13 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
 /**
- * Foreground service that shows a flashcard every [Prefs.intervalSeconds].
+ * Foreground service that shows a flashcard every [Prefs.intervalSeconds],
+ * but only while the screen is on and unlocked.
  *
  * Timer fork: replaces the old accessibility-service "card on app open"
  * trigger with a plain repeating interval chosen by the user in settings.
+ * Ticks that fire while the screen is off or the device is locked are
+ * skipped (no backlog, no lock-screen cards).
  */
 class CardTimerService : Service() {
 
@@ -76,6 +81,10 @@ class CardTimerService : Service() {
                     .coerceAtLeast(Prefs.MIN_INTERVAL_SECONDS.toLong())
                 delay(interval * 1000L)
                 if (!isActive) break
+                if (!isScreenOnAndUnlocked()) {
+                    Log.d(TAG, "Skipping card: screen off or locked")
+                    continue
+                }
                 showFlashcard()
             }
         }
@@ -125,12 +134,30 @@ class CardTimerService : Service() {
     }
 
     /**
+     * True only when the user can actually see and interact with a card:
+     * screen on AND not on the lock screen. This keeps cards from waking
+     * the phone, piling up on the lock screen, or firing while locked.
+     */
+    private fun isScreenOnAndUnlocked(): Boolean {
+        val pm = getSystemService(Context.POWER_SERVICE) as PowerManager
+        if (!pm.isInteractive) return false
+        val km = getSystemService(Context.KEYGUARD_SERVICE) as KeyguardManager
+        if (km.isKeyguardLocked) return false
+        return true
+    }
+
+    /**
      * Shows one card. Tries a direct activity launch (works when the app is
      * in the foreground) and also posts a full-screen-intent notification so
      * the card pops up from the background on Android 10+ where background
      * activity starts are restricted.
      */
     private fun showFlashcard() {
+        // Re-check: screen may have turned off between the loop tick and now.
+        if (!isScreenOnAndUnlocked()) {
+            Log.d(TAG, "Skipping card at show time: screen off or locked")
+            return
+        }
         val fullScreenIntent = Intent(this, FlashcardActivity::class.java).apply {
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
         }
