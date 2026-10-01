@@ -145,7 +145,7 @@ class MainActivity : ComponentActivity() {
                     },
                 )
                 StatusRow(
-                    label = "Notifications (for timer cards)",
+                    label = "Notifications (for timer status)",
                     done = notificationsOn,
                     actionLabel = "Allow",
                     onAction = {

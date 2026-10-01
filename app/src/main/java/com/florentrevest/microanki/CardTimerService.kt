@@ -147,10 +147,8 @@ class CardTimerService : Service() {
     }
 
     /**
-     * Shows one card. Tries a direct activity launch (works when the app is
-     * in the foreground) and also posts a full-screen-intent notification so
-     * the card pops up from the background on Android 10+ where background
-     * activity starts are restricted.
+     * Shows one card — just the flashcard, no push notification.
+     * Direct activity launch only.
      */
     private fun showFlashcard() {
         // Re-check: screen may have turned off between the loop tick and now.
@@ -158,34 +156,14 @@ class CardTimerService : Service() {
             Log.d(TAG, "Skipping card at show time: screen off or locked")
             return
         }
-        val fullScreenIntent = Intent(this, FlashcardActivity::class.java).apply {
+        val cardIntent = Intent(this, FlashcardActivity::class.java).apply {
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
         }
-        val fullScreenPending = PendingIntent.getActivity(
-            this, CARD_REQUEST_CODE, fullScreenIntent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
-        )
-
-        // Direct launch: fastest path when allowed.
         try {
-            startActivity(fullScreenIntent)
+            startActivity(cardIntent)
         } catch (e: Exception) {
-            Log.w(TAG, "Direct card launch failed, using full-screen notification", e)
+            Log.w(TAG, "Could not launch flashcard", e)
         }
-
-        // Full-screen fallback: heads-up notification that auto-opens the card.
-        val cardNotification = NotificationCompat.Builder(this, CHANNEL_CARD)
-            .setSmallIcon(android.R.drawable.ic_dialog_info)
-            .setContentTitle("Time for a flashcard")
-            .setContentText("Tap to review your next due card")
-            .setPriority(NotificationCompat.PRIORITY_MAX)
-            .setCategory(NotificationCompat.CATEGORY_ALARM)
-            .setContentIntent(fullScreenPending)
-            .setFullScreenIntent(fullScreenPending, true)
-            .setAutoCancel(true)
-            .build()
-        val nm = getSystemService(NotificationManager::class.java)
-        nm?.notify(CARD_NOTIFICATION_ID + (System.currentTimeMillis() % 10_000).toInt(), cardNotification)
     }
 
     private fun createChannels() {
@@ -196,12 +174,6 @@ class CardTimerService : Service() {
                 CHANNEL_TIMER, "Timer status",
                 NotificationManager.IMPORTANCE_LOW,
             ).apply { description = "Shows while the flashcard timer is running" }
-        )
-        nm.createNotificationChannel(
-            NotificationChannel(
-                CHANNEL_CARD, "Flashcards",
-                NotificationManager.IMPORTANCE_HIGH,
-            ).apply { description = "Pops up a flashcard every interval" }
         )
     }
 
@@ -220,10 +192,7 @@ class CardTimerService : Service() {
         const val ACTION_STOP = "com.florentrevest.microanki.STOP_TIMER"
 
         const val CHANNEL_TIMER = "microanki_timer"
-        const val CHANNEL_CARD = "microanki_cards"
         private const val ONGOING_ID = 1001
-        private const val CARD_NOTIFICATION_ID = 2000
-        private const val CARD_REQUEST_CODE = 42
 
         @Volatile
         var isRunning: Boolean = false

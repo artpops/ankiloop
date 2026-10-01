@@ -24,12 +24,11 @@ normal spaced-repetition scheduling keeps working.
 1. You pick a deck and set **seconds between cards** (minimum 10s, default
    300s / 5min), then press **Start timer**.
 2. A foreground service (`CardTimerService`) waits for the interval, then shows
-   a full-screen **flashcard** on top: question → *Show answer* → grade it
+   just the **flashcard** on top: question → *Show answer* → grade it
    (Again / Hard / Good / Easy) — but only if the screen is on and the
    device is unlocked. Ticks that fire while the screen is off or locked are
    skipped, so cards never wake the phone or pile up on the lock screen.
-   It uses a direct launch plus a full-screen intent notification so the
-   card appears even from the background on Android 10+.
+   No per-card push notifications — only the flashcard itself.
 3. Grading is sent to AnkiDroid, which reschedules the card. The timer keeps
    running until you press **Stop timer** (ongoing notification also has a
    Stop action). It restarts after reboot if left enabled.
@@ -42,7 +41,8 @@ Open MicroAnki and work down the checklist:
    - Install **AnkiDroid** (if you haven't).
    - Grant MicroAnki access to your AnkiDroid collection.
    - Allow **Display over other apps**.
-   - Allow **Notifications** (used for timer cards).
+   - Allow **Notifications** (only for the persistent timer status Android
+     requires for foreground services — no per-card pushes).
    - Optionally **Ignore battery optimizations** so the timer isn't killed.
 2. **Deck** — pick the deck you want to practise.
 3. **Card interval** — set seconds between cards, use presets (30s / 1m / 5m /
