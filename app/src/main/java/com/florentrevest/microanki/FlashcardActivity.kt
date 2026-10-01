@@ -52,8 +52,11 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /**
- * Card shown as a dialog floating on top of whichever app just came to the
- * foreground — the app stays visible behind a dimming scrim.
+ * Card shown as a dialog floating on top of whatever you are doing — the app
+ * underneath shows through a dimming scrim.
+ *
+ * Timer fork: this screen is launched every [Prefs.intervalSeconds] by
+ * [CardTimerService] instead of on app-open.
  *
  * Flow: load the next due card -> show the question -> reveal the answer ->
  * grade it (which reschedules it in AnkiDroid) -> dismiss and let the user

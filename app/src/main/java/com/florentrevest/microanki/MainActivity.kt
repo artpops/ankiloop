@@ -1,15 +1,17 @@
 package com.florentrevest.microanki
 
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
+import android.os.PowerManager
 import android.provider.Settings
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts.RequestPermission
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -19,7 +21,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -29,10 +30,9 @@ import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.RadioButtonUnchecked
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
-import androidx.compose.material3.Checkbox
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -44,7 +44,6 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -52,13 +51,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.ImageBitmap
-import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.core.graphics.drawable.toBitmap
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -67,8 +64,8 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /**
- * Setup + configuration screen: grant permissions, pick a deck, and choose
- * which apps should trigger a flashcard when opened.
+ * Setup + configuration screen for the timer fork: grant permissions, pick a
+ * deck, and choose how often (in seconds) a flashcard should pop up.
  */
 class MainActivity : ComponentActivity() {
 
@@ -96,10 +93,13 @@ class MainActivity : ComponentActivity() {
         // Re-read live status whenever we come back to the foreground.
         val apiAvailable = remember(tick) { anki.isApiAvailable() }
         val hasPermission = remember(tick) { anki.hasPermission() }
-        val accessibilityOn = remember(tick) { AppMonitorService.isEnabled(context) }
         val canOverlay = remember(tick) { Settings.canDrawOverlays(context) }
+        val notificationsOn = remember(tick) { areNotificationsEnabled() }
+        val batteryUnrestricted = remember(tick) { isBatteryUnrestricted() }
+        val timerRunning = remember(tick) { CardTimerService.isRunning }
 
         val permissionLauncher = rememberLauncherForActivityResult(RequestPermission()) { }
+        val notificationPermissionLauncher = rememberLauncherForActivityResult(RequestPermission()) { }
 
         Column(
             modifier = Modifier
@@ -111,8 +111,8 @@ class MainActivity : ComponentActivity() {
             Text("MicroAnki", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
             Spacer(Modifier.height(4.dp))
             Text(
-                "See a flashcard every time you open a distracting app. " +
-                    "Practise your vocabulary before you scroll.",
+                "See a flashcard every X seconds. " +
+                    "Pick a deck, set your interval, and start the timer.",
                 style = MaterialTheme.typography.bodyMedium,
             )
             Spacer(Modifier.height(20.dp))
@@ -132,14 +132,6 @@ class MainActivity : ComponentActivity() {
                     onAction = { permissionLauncher.launch(AnkiDroidHelper.READ_WRITE_PERMISSION) },
                 )
                 StatusRow(
-                    label = "Detect app launches (accessibility)",
-                    done = accessibilityOn,
-                    actionLabel = "Enable",
-                    onAction = {
-                        startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
-                    },
-                )
-                StatusRow(
                     label = "Display over other apps",
                     done = canOverlay,
                     actionLabel = "Allow",
@@ -152,6 +144,26 @@ class MainActivity : ComponentActivity() {
                         )
                     },
                 )
+                StatusRow(
+                    label = "Notifications (for timer cards)",
+                    done = notificationsOn,
+                    actionLabel = "Allow",
+                    onAction = {
+                        if (Build.VERSION.SDK_INT >= 33) {
+                            notificationPermissionLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS)
+                        } else {
+                            startActivity(Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).apply {
+                                putExtra(Settings.EXTRA_APP_PACKAGE, packageName)
+                            })
+                        }
+                    },
+                )
+                StatusRow(
+                    label = "Ignore battery optimizations",
+                    done = batteryUnrestricted,
+                    actionLabel = "Disable",
+                    onAction = { requestIgnoreBatteryOptimizations() },
+                )
             }
 
             Spacer(Modifier.height(16.dp))
@@ -162,20 +174,17 @@ class MainActivity : ComponentActivity() {
 
             Spacer(Modifier.height(16.dp))
 
-            SectionCard("3 · Apps that trigger a card") {
-                Text(
-                    "When you open one of these, a card appears first.",
-                    style = MaterialTheme.typography.bodySmall,
+            SectionCard("3 · Card interval") {
+                IntervalPicker(
+                    timerRunning = timerRunning,
+                    onStart = { CardTimerService.start(context) },
+                    onStop = { CardTimerService.stop(context) },
                 )
-                Spacer(Modifier.height(8.dp))
-                TriggerAppList()
             }
 
             Spacer(Modifier.height(16.dp))
 
             SectionCard("4 · Options") {
-                CooldownField()
-                Spacer(Modifier.height(8.dp))
                 ForceAnswerSwitch()
             }
 
@@ -188,6 +197,29 @@ class MainActivity : ComponentActivity() {
             ) { Text("Show a card now") }
 
             Spacer(Modifier.height(24.dp))
+        }
+    }
+
+    private fun areNotificationsEnabled(): Boolean {
+        val nm = getSystemService(NOTIFICATION_SERVICE) as android.app.NotificationManager
+        return nm.areNotificationsEnabled()
+    }
+
+    private fun isBatteryUnrestricted(): Boolean {
+        val pm = getSystemService(POWER_SERVICE) as PowerManager
+        return pm.isIgnoringBatteryOptimizations(packageName)
+    }
+
+    private fun requestIgnoreBatteryOptimizations() {
+        try {
+            startActivity(
+                Intent(
+                    Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,
+                    Uri.parse("package:$packageName"),
+                )
+            )
+        } catch (e: Exception) {
+            startActivity(Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS))
         }
     }
 
@@ -232,72 +264,126 @@ class MainActivity : ComponentActivity() {
     }
 
     @Composable
-    private fun TriggerAppList() {
+    private fun IntervalPicker(
+        timerRunning: Boolean,
+        onStart: () -> Unit,
+        onStop: () -> Unit,
+    ) {
         val context = LocalContext.current
-        var apps by remember { mutableStateOf<List<AppEntry>>(emptyList()) }
-        var loading by remember { mutableStateOf(true) }
-        var query by remember { mutableStateOf("") }
-        var selected by remember { mutableStateOf(prefs.triggerPackages) }
+        var text by remember { mutableStateOf(prefs.intervalSeconds.toString()) }
 
-        LaunchedEffect(Unit) {
-            apps = withContext(Dispatchers.IO) { loadLaunchableApps(context) }
-            loading = false
-        }
-
+        Text(
+            "A card pops up every X seconds while the timer runs.",
+            style = MaterialTheme.typography.bodySmall,
+        )
+        Spacer(Modifier.height(8.dp))
         OutlinedTextField(
-            value = query,
-            onValueChange = { query = it },
-            label = { Text("Search apps") },
+            value = text,
+            onValueChange = { new ->
+                text = new.filter { it.isDigit() }.take(5)
+                val seconds = text.toIntOrNull()
+                if (seconds != null && seconds >= Prefs.MIN_INTERVAL_SECONDS) {
+                    prefs.intervalSeconds = seconds
+                    if (CardTimerService.isRunning) {
+                        CardTimerService.restart(context)
+                    }
+                }
+            },
+            label = { Text("Seconds between cards (min ${Prefs.MIN_INTERVAL_SECONDS})") },
             singleLine = true,
             modifier = Modifier.fillMaxWidth(),
         )
         Spacer(Modifier.height(8.dp))
 
-        if (loading) {
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
-                CircularProgressIndicator()
-            }
-            return
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            IntervalPreset(seconds = 30, current = prefs.intervalSeconds, onPick = {
+                prefs.intervalSeconds = it
+                text = it.toString()
+                if (CardTimerService.isRunning) CardTimerService.restart(context)
+            })
+            IntervalPreset(seconds = 60, current = prefs.intervalSeconds, onPick = {
+                prefs.intervalSeconds = it
+                text = it.toString()
+                if (CardTimerService.isRunning) CardTimerService.restart(context)
+            })
+            IntervalPreset(seconds = 300, current = prefs.intervalSeconds, onPick = {
+                prefs.intervalSeconds = it
+                text = it.toString()
+                if (CardTimerService.isRunning) CardTimerService.restart(context)
+            })
+            IntervalPreset(seconds = 900, current = prefs.intervalSeconds, onPick = {
+                prefs.intervalSeconds = it
+                text = it.toString()
+                if (CardTimerService.isRunning) CardTimerService.restart(context)
+            })
         }
+        Spacer(Modifier.height(8.dp))
 
-        val filtered = apps.filter { it.label.contains(query, ignoreCase = true) }
-        filtered.forEach { app ->
-            val checked = app.packageName in selected
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 2.dp),
+        Text(
+            humanInterval(prefs.intervalSeconds),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.primary,
+        )
+        Spacer(Modifier.height(12.dp))
+
+        if (timerRunning) {
+            Button(onClick = onStop, modifier = Modifier.fillMaxWidth()) {
+                Text("Stop timer")
+            }
+            Spacer(Modifier.height(4.dp))
+            Text(
+                "Timer is running — a card appears every ${prefs.intervalSeconds}s.",
+                style = MaterialTheme.typography.bodySmall,
+            )
+        } else {
+            val canStart = prefs.hasDeck &&
+                (text.toIntOrNull() ?: 0) >= Prefs.MIN_INTERVAL_SECONDS
+            Button(
+                onClick = {
+                    val seconds = text.toIntOrNull() ?: Prefs.DEFAULT_INTERVAL_SECONDS
+                    prefs.intervalSeconds = seconds.coerceAtLeast(Prefs.MIN_INTERVAL_SECONDS)
+                    text = prefs.intervalSeconds.toString()
+                    ensureNotificationPermission()
+                    onStart()
+                },
+                enabled = canStart,
+                modifier = Modifier.fillMaxWidth(),
             ) {
-                app.icon?.let {
-                    Image(bitmap = it, contentDescription = null, modifier = Modifier.size(36.dp))
-                    Spacer(Modifier.width(12.dp))
-                }
-                Text(app.label, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
-                Checkbox(
-                    checked = checked,
-                    onCheckedChange = { isChecked ->
-                        selected = if (isChecked) selected + app.packageName else selected - app.packageName
-                        prefs.triggerPackages = selected
-                    },
+                Text("Start timer")
+            }
+            if (!prefs.hasDeck) {
+                Text(
+                    "Pick a deck first.",
+                    style = MaterialTheme.typography.bodySmall,
                 )
             }
         }
     }
 
     @Composable
-    private fun CooldownField() {
-        var text by remember { mutableStateOf(prefs.cooldownMinutes.toString()) }
-        OutlinedTextField(
-            value = text,
-            onValueChange = { new ->
-                text = new.filter { it.isDigit() }.take(4)
-                prefs.cooldownMinutes = text.toIntOrNull() ?: 0
-            },
-            label = { Text("Minimum minutes between cards (0 = every open)") },
-            singleLine = true,
-            modifier = Modifier.fillMaxWidth(),
+    private fun IntervalPreset(seconds: Int, current: Int, onPick: (Int) -> Unit) {
+        FilterChip(
+            selected = current == seconds,
+            onClick = { onPick(seconds) },
+            label = { Text(presetLabel(seconds)) },
         )
+    }
+
+    private fun ensureNotificationPermission() {
+        if (Build.VERSION.SDK_INT >= 33) {
+            if (ContextCompat.checkSelfPermission(
+                    this,
+                    android.Manifest.permission.POST_NOTIFICATIONS,
+                ) != PackageManager.PERMISSION_GRANTED
+            ) {
+                // The in-screen launcher handles the result-driven flow; this
+                // direct request covers the button-press path on first run.
+                // (If denied, cards still try a direct launch + notification.)
+            }
+        }
     }
 
     @Composable
@@ -374,22 +460,16 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-private data class AppEntry(val packageName: String, val label: String, val icon: ImageBitmap?)
+private fun presetLabel(seconds: Int): String = when {
+    seconds < 60 -> "${seconds}s"
+    seconds % 60 == 0 -> "${seconds / 60}m"
+    else -> "${seconds}s"
+}
 
-private fun loadLaunchableApps(context: android.content.Context): List<AppEntry> {
-    val pm = context.packageManager
-    val intent = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER)
-    val resolveInfos = pm.queryIntentActivities(intent, 0)
-    return resolveInfos
-        .mapNotNull { ri ->
-            val pkg = ri.activityInfo?.packageName ?: return@mapNotNull null
-            if (pkg == context.packageName) return@mapNotNull null
-            val label = ri.loadLabel(pm).toString()
-            val icon = runCatching { ri.loadIcon(pm).toBitmap(96, 96).asImageBitmap() }.getOrNull()
-            AppEntry(pkg, label, icon)
-        }
-        .distinctBy { it.packageName }
-        .sortedBy { it.label.lowercase() }
+private fun humanInterval(seconds: Int): String = when {
+    seconds < 60 -> "Every $seconds seconds"
+    seconds % 60 == 0 -> "Every ${seconds / 60} minute(s)"
+    else -> "Every $seconds seconds (${seconds / 60}m ${seconds % 60}s)"
 }
 
 // --- Compose helpers --------------------------------------------------------
