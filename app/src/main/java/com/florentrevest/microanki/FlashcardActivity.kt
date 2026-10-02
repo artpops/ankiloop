@@ -20,18 +20,17 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -71,14 +70,21 @@ class FlashcardActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
-            MaterialTheme(colorScheme = appColorScheme()) {
-                FlashcardScreen()
+            val systemDark = isDark()
+            // Snapshot the theme id at composition so a mid-card settings change
+            // doesn't restyle the open card halfway through.
+            val themeId = remember { prefs.cardThemeId }
+            val cardTheme = remember(themeId, systemDark) {
+                resolveCardTheme(themeId, systemDark)
+            }
+            MaterialTheme(colorScheme = cardTheme.colorScheme()) {
+                FlashcardScreen(cardTheme = cardTheme)
             }
         }
     }
 
     @Composable
-    private fun FlashcardScreen() {
+    private fun FlashcardScreen(cardTheme: CardTheme) {
         var state by remember { mutableStateOf<CardUiState>(CardUiState.Loading) }
         var answerRevealed by remember { mutableStateOf(false) }
         var shownAt by remember { mutableStateOf(0L) }
@@ -93,7 +99,7 @@ class FlashcardActivity : ComponentActivity() {
         val blockBack = prefs.forceAnswer && state is CardUiState.Card && !answerRevealed
         BackHandler(enabled = blockBack) { /* intentionally ignored */ }
 
-        Dialog {
+        Dialog(cardTheme = cardTheme) {
             when (val s = state) {
                 CardUiState.Loading -> Box(
                     modifier = Modifier.fillMaxWidth().heightIn(min = 96.dp),
@@ -105,6 +111,7 @@ class FlashcardActivity : ComponentActivity() {
 
                 is CardUiState.Card -> CardContent(
                     card = s.card,
+                    cardTheme = cardTheme,
                     answerRevealed = answerRevealed,
                     onReveal = { answerRevealed = true },
                     onGrade = { ease ->
@@ -147,25 +154,42 @@ class FlashcardActivity : ComponentActivity() {
         }
     }
 
-    /** Dimmed backdrop (the app underneath shows through) with a centred card. */
+    /**
+     * Dimmed backdrop (the app underneath shows through) with a centred card.
+     *
+     * Landscape-aware: in landscape vertical space is tight, so the dialog
+     * uses smaller outer padding, a wider card, and caps the card body to a
+     * fraction of the screen height (content scrolls inside instead of
+     * overflowing). The activity itself is orientation-free (see manifest),
+     * so it stays in landscape instead of snapping back to portrait.
+     */
     @Composable
-    private fun Dialog(content: @Composable () -> Unit) {
+    private fun Dialog(cardTheme: CardTheme, content: @Composable () -> Unit) {
+        val configuration = androidx.compose.ui.platform.LocalConfiguration.current
+        val isLandscape = configuration.screenWidthDp > configuration.screenHeightDp
+        val outerPadding = if (isLandscape) 12.dp else 24.dp
+        val cardMaxWidth = if (isLandscape) 560.dp else 420.dp
+        // Cap the whole card so Show answer / grade buttons stay visible.
+        val dialogMaxHeightFraction = if (isLandscape) 0.92f else 0.85f
+
         Box(
             modifier = Modifier
                 .fillMaxSize()
                 .background(Color.Black.copy(alpha = 0.6f))
                 .safeDrawingPadding()
-                .padding(24.dp),
+                .padding(outerPadding),
             contentAlignment = Alignment.Center,
         ) {
-            Surface(
-                modifier = Modifier.fillMaxWidth().widthIn(max = 420.dp),
-                shape = RoundedCornerShape(28.dp),
-                color = MaterialTheme.colorScheme.surface,
-                tonalElevation = 6.dp,
-                shadowElevation = 8.dp,
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .widthIn(max = cardMaxWidth)
+                    .fillMaxHeight(dialogMaxHeightFraction)
+                    .background(brush = cardTheme.brush(), shape = androidx.compose.foundation.shape.RoundedCornerShape(cardTheme.corner))
+                    .verticalScroll(rememberScrollState())
+                    .padding(24.dp),
             ) {
-                Column(modifier = Modifier.padding(24.dp)) { content() }
+                Column { content() }
             }
         }
     }
@@ -173,18 +197,23 @@ class FlashcardActivity : ComponentActivity() {
     @Composable
     private fun CardContent(
         card: ReviewCard,
+        cardTheme: CardTheme,
         answerRevealed: Boolean,
         onReveal: () -> Unit,
         onGrade: (Int) -> Unit,
     ) {
-        val dark = isDark()
+        val configuration = androidx.compose.ui.platform.LocalConfiguration.current
+        val isLandscape = configuration.screenWidthDp > configuration.screenHeightDp
         val html = if (answerRevealed) card.answer else card.question
+        // In landscape cap the card body lower so buttons stay on screen; the
+        // outer dialog already scrolls as a fallback.
+        val bodyMax = if (isLandscape) 220.dp else 320.dp
         // The box gives the card a comfortable minimum height and caps it so a
         // wordy card scrolls instead of filling the screen; the WebView inside
         // measures to its own content, so a short card is exactly as tall as it
         // needs to be and never reports itself as scrollable.
         Box(
-            modifier = Modifier.fillMaxWidth().heightIn(min = 140.dp, max = 320.dp),
+            modifier = Modifier.fillMaxWidth().heightIn(min = 120.dp, max = bodyMax),
             contentAlignment = Alignment.Center,
         ) {
             // A WebView always measures its own scroll range slightly larger
@@ -194,11 +223,11 @@ class FlashcardActivity : ComponentActivity() {
             // need a browser (images, tables, ...).
             if (needsWebView(html)) {
                 CardWebView(
-                    html = buildCardHtml(html, dark),
+                    html = buildCardHtml(html, cardTheme),
                     modifier = Modifier.fillMaxWidth(),
                 )
             } else {
-                CardText(html)
+                CardText(html, cardTheme)
             }
         }
         Spacer(Modifier.height(20.dp))
@@ -213,7 +242,7 @@ class FlashcardActivity : ComponentActivity() {
 
     /** A plain-text card: the word (and, once revealed, its translation). */
     @Composable
-    private fun CardText(html: String) {
+    private fun CardText(html: String, cardTheme: CardTheme) {
         val sections = remember(html) { plainTextSections(html) }
         val size = remember(sections) { fontSizeFor(sections.joinToString(" ")) }
         Column(
@@ -226,6 +255,7 @@ class FlashcardActivity : ComponentActivity() {
                 if (index > 0) {
                     HorizontalDivider(
                         modifier = Modifier.fillMaxWidth(0.5f).padding(vertical = 16.dp),
+                        color = cardTheme.onSurface.copy(alpha = 0.25f),
                     )
                 }
                 Text(
@@ -233,7 +263,7 @@ class FlashcardActivity : ComponentActivity() {
                     fontSize = size.sp,
                     lineHeight = (size * 1.35f).sp,
                     textAlign = TextAlign.Center,
-                    color = MaterialTheme.colorScheme.onSurface,
+                    color = cardTheme.onSurface,
                 )
             }
         }
@@ -394,10 +424,10 @@ private fun fontSizeFor(content: String): Int {
     }
 }
 
-private fun buildCardHtml(content: String, dark: Boolean): String {
-    val fg = if (dark) "#ECEFF1" else "#1A1A1A"
+private fun buildCardHtml(content: String, theme: CardTheme): String {
+    val fg = theme.cssFg()
     val bg = "transparent"
-    val accent = if (dark) "#90CAF9" else "#1565C0"
+    val accent = theme.cssAccent()
     val fontSize = fontSizeFor(content)
     return """
         <!DOCTYPE html>

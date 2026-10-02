@@ -41,12 +41,16 @@
             </intent-filter>
         </activity>
 
-        <!-- Shown on top on every timer tick (screen-on only, never on lock screen). Its own task so it can return cleanly. -->
+        <!-- Shown on top on every timer tick (screen-on only, never on lock screen). Its own task so it can return cleanly.
+             Orientation-free: follows the current rotation (portrait/landscape) instead of
+             snapping back to portrait; handles rotation in place. -->
         <activity
             android:name=".FlashcardActivity"
             android:exported="false"
             android:excludeFromRecents="true"
             android:launchMode="singleInstance"
+            android:screenOrientation="unspecified"
+            android:configChanges="orientation|screenSize|screenLayout|keyboardHidden|smallestScreenSize|density"
             android:taskAffinity=""
             android:theme="@style/Theme.MicroAnki.Flashcard" />
 

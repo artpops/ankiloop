@@ -12,7 +12,9 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts.RequestPermission
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -21,6 +23,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -186,6 +189,12 @@ class MainActivity : ComponentActivity() {
 
             SectionCard("4 · Options") {
                 ForceAnswerSwitch()
+            }
+
+            Spacer(Modifier.height(16.dp))
+
+            SectionCard("5 · Card theme") {
+                ThemePicker()
             }
 
             Spacer(Modifier.height(20.dp))
@@ -405,6 +414,112 @@ class MainActivity : ComponentActivity() {
                 },
             )
         }
+    }
+
+    @Composable
+    private fun ThemePicker() {
+        var expanded by remember { mutableStateOf(false) }
+        var selectedId by remember { mutableStateOf(prefs.cardThemeId) }
+        var selected: CardTheme = remember(selectedId) { findCardTheme(selectedId) }
+        // System auto preview follows the actual UI mode.
+        val systemDark = isDark()
+        val preview: CardTheme = remember(selectedId, systemDark) {
+            resolveCardTheme(selectedId, systemDark)
+        }
+
+        Text(
+            "Customize how the pop-up flashcard looks.",
+            style = MaterialTheme.typography.bodySmall,
+        )
+        Spacer(Modifier.height(8.dp))
+
+        Box {
+            OutlinedButton(onClick = { expanded = true }) {
+                Box(
+                    modifier = Modifier
+                        .size(20.dp)
+                        .background(brush = selected.brush(), shape = androidx.compose.foundation.shape.CircleShape),
+                )
+                Spacer(Modifier.width(8.dp))
+                Text("Theme: ${selected.name}")
+            }
+            DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+                ALL_CARD_THEMES.forEach { theme ->
+                    DropdownMenuItem(
+                        text = {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(24.dp)
+                                        .background(
+                                            brush = theme.brush(),
+                                            shape = androidx.compose.foundation.shape.CircleShape,
+                                        ),
+                                )
+                                Spacer(Modifier.width(12.dp))
+                                Column {
+                                    Text(theme.name)
+                                    Text(
+                                        theme.blurb,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                }
+                            }
+                        },
+                        onClick = {
+                            prefs.cardThemeId = theme.id
+                            selectedId = theme.id
+                            expanded = false
+                        },
+                    )
+                }
+            }
+        }
+
+        Spacer(Modifier.height(12.dp))
+
+        // Live preview using the selected theme's palette.
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(brush = preview.brush(), shape = RoundedCornerShape(preview.corner))
+                .padding(20.dp),
+            contentAlignment = Alignment.Center,
+        ) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text(
+                    "hola",
+                    style = MaterialTheme.typography.headlineLarge,
+                    color = preview.onSurface,
+                    fontWeight = FontWeight.Bold,
+                )
+                Text(
+                    "hello",
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = preview.onSurface.copy(alpha = 0.8f),
+                )
+                Spacer(Modifier.height(8.dp))
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth(0.6f)
+                        .height(36.dp)
+                        .background(
+                            color = preview.accent,
+                            shape = RoundedCornerShape(10.dp),
+                        ),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text("Show answer", color = androidx.compose.ui.graphics.Color.White)
+                }
+            }
+        }
+        Spacer(Modifier.height(4.dp))
+        Text(
+            preview.blurb,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
 
     // --- Small reusable pieces ---------------------------------------------

@@ -37,6 +37,11 @@ class Prefs(context: Context) {
         get() = sp.getBoolean(KEY_TIMER_ENABLED, false)
         set(value) = sp.edit().putBoolean(KEY_TIMER_ENABLED, value).apply()
 
+    /** Stored id of the pop-up flashcard theme (see ALL_CARD_THEMES). */
+    var cardThemeId: String
+        get() = sp.getString(KEY_CARD_THEME, SYSTEM_AUTO_THEME_ID) ?: SYSTEM_AUTO_THEME_ID
+        set(value) = sp.edit().putString(KEY_CARD_THEME, value).apply()
+
     val hasDeck: Boolean get() = deckId != NO_DECK
 
     companion object {
@@ -51,5 +56,6 @@ class Prefs(context: Context) {
         private const val KEY_INTERVAL_SECONDS = "interval_seconds"
         private const val KEY_FORCE = "force_answer"
         private const val KEY_TIMER_ENABLED = "timer_enabled"
+        private const val KEY_CARD_THEME = "card_theme_id"
     }
 }
