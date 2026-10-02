@@ -1,3 +1,5 @@
+<img src="header.png" alt="AnkiLoop header banner" width="100%">
+
 # AnkiLoop
 
 *I do one flashcard every X seconds.*
