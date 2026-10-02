@@ -1,4 +1,4 @@
-package com.florentrevest.microanki
+package com.ankiloop
 
 import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.darkColorScheme

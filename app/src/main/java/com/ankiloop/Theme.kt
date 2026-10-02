@@ -1,4 +1,4 @@
-package com.florentrevest.microanki
+package com.ankiloop
 
 import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme

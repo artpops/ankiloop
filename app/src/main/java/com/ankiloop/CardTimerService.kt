@@ -1,4 +1,4 @@
-package com.florentrevest.microanki
+package com.ankiloop
 
 import android.app.Notification
 import android.app.NotificationChannel
@@ -124,7 +124,7 @@ class CardTimerService : Service() {
         )
         return NotificationCompat.Builder(this, CHANNEL_TIMER)
             .setSmallIcon(android.R.drawable.ic_dialog_info)
-            .setContentTitle("MicroAnki timer running")
+            .setContentTitle("AnkiLoop timer running")
             .setContentText("A card every ${prefs.intervalSeconds}s — tap Stop to pause")
             .setContentIntent(openApp)
             .addAction(android.R.drawable.ic_menu_close_clear_cancel, "Stop", stop)
@@ -188,10 +188,10 @@ class CardTimerService : Service() {
     companion object {
         private const val TAG = "CardTimerService"
 
-        const val ACTION_START = "com.florentrevest.microanki.START_TIMER"
-        const val ACTION_STOP = "com.florentrevest.microanki.STOP_TIMER"
+        const val ACTION_START = "com.ankiloop.START_TIMER"
+        const val ACTION_STOP = "com.ankiloop.STOP_TIMER"
 
-        const val CHANNEL_TIMER = "microanki_timer"
+        const val CHANNEL_TIMER = "ankiloop_timer"
         private const val ONGOING_ID = 1001
 
         @Volatile

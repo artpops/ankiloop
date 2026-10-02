@@ -24,5 +24,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "MicroAnki"
+rootProject.name = "AnkiLoop"
 include(":app")

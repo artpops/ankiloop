@@ -1,4 +1,4 @@
-package com.florentrevest.microanki
+package com.ankiloop
 
 import android.os.Bundle
 import android.view.View
@@ -127,15 +127,15 @@ class FlashcardActivity : ComponentActivity() {
         when {
             !anki.isApiAvailable() -> CardUiState.Message(
                 "AnkiDroid not found",
-                "Install AnkiDroid and open MicroAnki to finish setup.",
+                "Install AnkiDroid and open AnkiLoop to finish setup.",
             )
             !anki.hasPermission() -> CardUiState.Message(
                 "Permission needed",
-                "Open MicroAnki and grant access to your AnkiDroid collection.",
+                "Open AnkiLoop and grant access to your AnkiDroid collection.",
             )
             !prefs.hasDeck -> CardUiState.Message(
                 "No deck chosen",
-                "Open MicroAnki and pick a deck to practise.",
+                "Open AnkiLoop and pick a deck to practise.",
             )
             else -> when (val card = anki.getNextCard(prefs.deckId)) {
                 null -> CardUiState.Message(
@@ -271,7 +271,10 @@ class FlashcardActivity : ComponentActivity() {
 
     @Composable
     private fun GradeButtons(card: ReviewCard, onGrade: (Int) -> Unit) {
-        val buttons = easeButtonsFor(card)
+        val showTimes = prefs.showIntervals
+        val buttons = easeButtonsFor(card).map { btn ->
+            if (showTimes) btn else btn.copy(interval = null)
+        }
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(6.dp),

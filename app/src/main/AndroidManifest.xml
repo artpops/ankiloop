@@ -28,7 +28,7 @@
         android:label="@string/app_name"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
-        android:theme="@style/Theme.MicroAnki"
+        android:theme="@style/Theme.AnkiLoop"
         tools:targetApi="31">
 
         <activity
@@ -52,7 +52,7 @@
             android:screenOrientation="unspecified"
             android:configChanges="orientation|screenSize|screenLayout|keyboardHidden|smallestScreenSize|density"
             android:taskAffinity=""
-            android:theme="@style/Theme.MicroAnki.Flashcard" />
+            android:theme="@style/Theme.AnkiLoop.Flashcard" />
 
         <!-- Timer fork: shows a card every X seconds -->
         <service

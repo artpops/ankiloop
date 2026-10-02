@@ -1,23 +1,22 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <style name="Theme.MicroAnki" parent="android:Theme.Material.Light.NoActionBar">
+    <style name="Theme.AnkiLoop" parent="android:Theme.Material.Light.NoActionBar">
         <item name="android:windowBackground">@color/window_bg</item>
         <item name="android:statusBarColor">@android:color/transparent</item>
         <item name="android:navigationBarColor">@android:color/transparent</item>
     </style>
 
-    <!-- Floats over whatever app just came to the foreground: the window itself is
-         transparent and the scrim + dialog are drawn in Compose. -->
-    <style name="Theme.MicroAnki.Flashcard" parent="Theme.MicroAnki">
+    <!-- Transparent flashcard window: the scrim + dialog are drawn in Compose. -->
+    <style name="Theme.AnkiLoop.Flashcard" parent="Theme.AnkiLoop">
         <item name="android:windowIsTranslucent">true</item>
         <item name="android:windowBackground">@android:color/transparent</item>
         <item name="android:backgroundDimEnabled">false</item>
-        <item name="android:windowAnimationStyle">@style/Animation.MicroAnki.None</item>
+        <item name="android:windowAnimationStyle">@style/Animation.AnkiLoop.None</item>
     </style>
 
-    <!-- No open/close animation: the card should appear the instant the app it
-         overlays does, not slide in a beat later. -->
-    <style name="Animation.MicroAnki.None" parent="@android:style/Animation">
+    <!-- No open/close animation: the card should appear the instant the timer
+         fires, not slide in a beat later. -->
+    <style name="Animation.AnkiLoop.None" parent="@android:style/Animation">
         <item name="android:activityOpenEnterAnimation">@null</item>
         <item name="android:activityOpenExitAnimation">@null</item>
         <item name="android:activityCloseEnterAnimation">@null</item>

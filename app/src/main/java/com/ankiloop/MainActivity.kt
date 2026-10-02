@@ -1,4 +1,4 @@
-package com.florentrevest.microanki
+package com.ankiloop
 
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -111,7 +111,7 @@ class MainActivity : ComponentActivity() {
                 .verticalScroll(scroll)
                 .padding(20.dp),
         ) {
-            Text("MicroAnki", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+            Text("AnkiLoop", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
             Spacer(Modifier.height(4.dp))
             Text(
                 "See a flashcard every X seconds. " +
@@ -189,6 +189,8 @@ class MainActivity : ComponentActivity() {
 
             SectionCard("4 · Options") {
                 ForceAnswerSwitch()
+                Spacer(Modifier.height(8.dp))
+                ShowIntervalsSwitch()
             }
 
             Spacer(Modifier.height(16.dp))
@@ -411,6 +413,27 @@ class MainActivity : ComponentActivity() {
                 onCheckedChange = {
                     force = it
                     prefs.forceAnswer = it
+                },
+            )
+        }
+    }
+
+    @Composable
+    private fun ShowIntervalsSwitch() {
+        var show by remember { mutableStateOf(prefs.showIntervals) }
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text("Show next review time", style = MaterialTheme.typography.bodyLarge)
+                Text(
+                    "Shows when the card will appear again under each grade button.",
+                    style = MaterialTheme.typography.bodySmall,
+                )
+            }
+            Switch(
+                checked = show,
+                onCheckedChange = {
+                    show = it
+                    prefs.showIntervals = it
                 },
             )
         }

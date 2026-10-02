@@ -13,15 +13,15 @@ plugins {
 }
 
 android {
-    namespace = "com.florentrevest.microanki"
+    namespace = "com.ankiloop"
     compileSdk = 35
 
     defaultConfig {
-        applicationId = "com.florentrevest.microanki"
+        applicationId = "com.ankiloop"
         minSdk = 26
         targetSdk = 35
-        versionCode = 2
-        versionName = "1.1-timer"
+        versionCode = 3
+        versionName = "1.0"
     }
 
     signingConfigs {
